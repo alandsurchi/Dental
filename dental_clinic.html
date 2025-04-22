@@ -6,7 +6,7 @@
     <title>ALAN DENTAL CLINIC - Management System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Link to the separate CSS file -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./style.css">
 
     <!-- Add Supabase client -->
     <script type="module">
@@ -15,7 +15,7 @@
     </script>
 
     <!-- Link the main script as a module -->
-    <script type="module" src="script.js"></script>
+    <script type="module" src="./script.js"></script>
     
     <!-- IMPORTANT: Add initial redirect check after script loads but before rendering -->
     <script type="module">
@@ -24,6 +24,7 @@
         // If no role stored OR role is explicitly 'loggedOut' (shouldn't be stored 'loggedOut' normally)
         if (!storedRoleForRedirect || storedRoleForRedirect === '' || storedRoleForRedirect === 'loggedOut') {
              console.log('dental_clinic.html: No user role found in sessionStorage, redirecting to login.');
+            window.location.href = './login.html'; // Redirect to login page
             window.location.href = 'login.html'; // Redirect to login page
             // Prevent further execution of the script on this page until redirect happens
              throw new Error("Redirecting to login..."); // Halt script execution

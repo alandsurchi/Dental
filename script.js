@@ -40,9 +40,8 @@ if (!storedRoleForLoad || storedRoleForLoad === '' || storedRoleForLoad === 'log
      }
 }
 
-
-// Define window functions and data structures if execution is allowed to continue
-
+// Import the API bridge module
+import * as apiBridge from './api-bridge.js';
 
 // --- Global variables ---
 // currentUserRole is initialized by the early sessionStorage check or defaults to 'loggedOut'.
@@ -2132,3 +2131,658 @@ window.saveProfileSettings = function(event) { // Make global
 }
 
 // Note: resetProfileSettingsForm functionality is handled directly by closeModal clearing the form.
+
+// --- DOM MANIPULATION FUNCTIONS ---
+
+// Function to check in an appointment
+window.checkInAppointment = function(button) {
+    // Get the parent row
+    const row = button.closest('tr');
+    if (!row) return;
+    
+    // Get the appointment ID from the data-id attribute
+    const appointmentId = row.dataset.id;
+    
+    // Find the status cell and update it
+    const statusCell = row.querySelector('td:nth-child(6)');
+    if (statusCell) {
+        const statusBadge = statusCell.querySelector('.status-badge');
+        if (statusBadge) {
+            // Change from 'Confirmed' or 'Pending' to 'In Progress'
+            statusBadge.textContent = 'In Progress';
+            statusBadge.className = 'status-badge status-in-progress';
+            
+            // Change the button to "Complete"
+            button.textContent = 'Complete';
+            button.onclick = function() { completeAppointment(this); };
+            
+            // Update in-memory data
+            const appointmentIndex = window.allDemoAppointments.findIndex(a => a.id === appointmentId);
+            if (appointmentIndex !== -1) {
+                window.allDemoAppointments[appointmentIndex].status = 'In Progress';
+            }
+            
+            // Show notification
+            apiBridge.showNotification('Patient checked in successfully', 'success');
+        }
+    }
+}
+
+// Function to complete an appointment
+window.completeAppointment = function(button) {
+    // Get the parent row
+    const row = button.closest('tr');
+    if (!row) return;
+    
+    // Get the appointment ID from the data-id attribute
+    const appointmentId = row.dataset.id;
+    
+    // Find the status cell and update it
+    const statusCell = row.querySelector('td:nth-child(6)');
+    if (statusCell) {
+        const statusBadge = statusCell.querySelector('.status-badge');
+        if (statusBadge) {
+            // Change to 'Completed'
+            statusBadge.textContent = 'Completed';
+            statusBadge.className = 'status-badge status-completed';
+            
+            // Change the button to "Create Invoice"
+            button.textContent = 'Create Invoice';
+            button.onclick = function() { createInvoiceFromAppointment(this); };
+            
+            // Update in-memory data
+            const appointmentIndex = window.allDemoAppointments.findIndex(a => a.id === appointmentId);
+            if (appointmentIndex !== -1) {
+                window.allDemoAppointments[appointmentIndex].status = 'Completed';
+            }
+            
+            // Show notification
+            apiBridge.showNotification('Appointment completed successfully', 'success');
+        }
+    }
+}
+
+// Function to create an invoice from an appointment
+window.createInvoiceFromAppointment = function(button) {
+    // Get the parent row
+    const row = button.closest('tr');
+    if (!row) return;
+    
+    // Get the appointment ID from the data-id attribute
+    const appointmentId = row.dataset.id;
+    
+    // Find the appointment in data
+    const appointment = window.allDemoAppointments.find(a => a.id === appointmentId);
+    if (!appointment) return;
+    
+    // Find the treatment price
+    const treatment = window.allDemoTreatments.find(t => t.value === appointment.treatment);
+    const amount = treatment ? treatment.price : 100; // Default to 100 if not found
+    
+    // Create a new invoice
+    const newInvoice = {
+        patientId: appointment.patientId,
+        patientName: appointment.patient,
+        date: new Date().toISOString().split('T')[0], // Today's date
+        treatment: appointment.treatment,
+        amount: amount,
+        status: 'Pending',
+        method: '',
+        notes: `Invoice for ${appointment.treatment} on ${appointment.date}`
+    };
+    
+    // Add the invoice to the data
+    apiBridge.addInvoice(newInvoice)
+        .then(invoice => {
+            // Change the button to "View Invoice"
+            button.textContent = 'View Invoice';
+            button.onclick = function() { 
+                showSection('billing');
+                selectInvoice(invoice.id);
+            };
+            
+            // Show notification
+            apiBridge.showNotification('Invoice created successfully', 'success');
+            
+            // Update appointment to link to invoice (could add invoiceId field to appointment if needed)
+        })
+        .catch(error => {
+            apiBridge.showNotification('Failed to create invoice', 'error');
+            console.error(error);
+        });
+}
+
+// Function to select an invoice for viewing/editing
+window.selectInvoice = function(invoiceId) {
+    // Find the invoice
+    const invoice = window.allDemoInvoices.find(i => i.id === invoiceId);
+    if (!invoice) return;
+    
+    // Show the invoice details in the appropriate panel
+    const invoiceDetailPanel = document.getElementById('invoice-detail');
+    if (!invoiceDetailPanel) return;
+    
+    // Set active tab to invoices
+    activateTab('billing', 'invoices');
+    
+    // Populate invoice details (simplified example)
+    const detailsHTML = `
+        <div class="invoice-header">
+            <h3>Invoice #${invoice.id}</h3>
+            <span class="status-badge status-${invoice.status.toLowerCase()}">${invoice.status}</span>
+        </div>
+        <div class="invoice-details">
+            <div class="detail-row">
+                <span class="label">Patient:</span>
+                <span class="value">${invoice.patientName}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Date:</span>
+                <span class="value">${apiBridge.formatDate(invoice.date)}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Treatment:</span>
+                <span class="value">${invoice.treatment}</span>
+            </div>
+            <div class="detail-row">
+                <span class="label">Amount:</span>
+                <span class="value">${apiBridge.formatCurrency(invoice.amount)}</span>
+            </div>
+            ${invoice.notes ? `
+                <div class="detail-row">
+                    <span class="label">Notes:</span>
+                    <span class="value">${invoice.notes}</span>
+                </div>
+            ` : ''}
+        </div>
+        ${invoice.status === 'Pending' ? `
+            <div class="invoice-actions">
+                <button class="btn btn-primary" onclick="processPayment('${invoice.id}')">Process Payment</button>
+            </div>
+        ` : ''}
+    `;
+    
+    // Update the panel
+    const detailsContainer = invoiceDetailPanel.querySelector('.details-container') || invoiceDetailPanel;
+    detailsContainer.innerHTML = detailsHTML;
+    
+    // Show the panel
+    invoiceDetailPanel.style.display = 'block';
+}
+
+// Function to process a payment
+window.processPayment = function(invoiceId) {
+    // Create a payment form
+    const formHTML = `
+        <div class="payment-form">
+            <h3>Process Payment</h3>
+            <div class="form-group">
+                <label for="payment-method">Payment Method</label>
+                <select id="payment-method" class="form-control">
+                    ${window.allDemoPaymentMethods.map(m => `
+                        <option value="${m.value}">${m.name}</option>
+                    `).join('')}
+                </select>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-secondary" onclick="cancelPayment()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmPayment('${invoiceId}')">Confirm Payment</button>
+            </div>
+        </div>
+    `;
+    
+    // Find or create payment modal
+    let paymentModal = document.getElementById('payment-modal');
+    if (!paymentModal) {
+        paymentModal = document.createElement('div');
+        paymentModal.id = 'payment-modal';
+        paymentModal.className = 'modal';
+        document.body.appendChild(paymentModal);
+        
+        // Style the modal
+        paymentModal.style.position = 'fixed';
+        paymentModal.style.top = '0';
+        paymentModal.style.left = '0';
+        paymentModal.style.width = '100%';
+        paymentModal.style.height = '100%';
+        paymentModal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        paymentModal.style.display = 'flex';
+        paymentModal.style.alignItems = 'center';
+        paymentModal.style.justifyContent = 'center';
+        paymentModal.style.zIndex = '9999';
+    }
+    
+    // Set content and show
+    paymentModal.innerHTML = `
+        <div class="modal-content" style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 100%;">
+            ${formHTML}
+        </div>
+    `;
+    paymentModal.style.display = 'flex';
+}
+
+// Function to cancel payment
+window.cancelPayment = function() {
+    const modal = document.getElementById('payment-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Function to confirm payment
+window.confirmPayment = function(invoiceId) {
+    const methodSelect = document.getElementById('payment-method');
+    if (!methodSelect) return;
+    
+    const paymentMethod = methodSelect.value;
+    
+    // Update invoice status
+    apiBridge.updateInvoiceStatus(invoiceId, 'Paid', paymentMethod)
+        .then(() => {
+            // Hide payment modal
+            cancelPayment();
+            
+            // Refresh invoice list and details
+            renderInvoiceTableBody();
+            renderPaymentHistoryTableBody();
+            
+            // Re-select the invoice to show updated details
+            selectInvoice(invoiceId);
+            
+            // Show notification
+            apiBridge.showNotification('Payment processed successfully', 'success');
+        })
+        .catch(error => {
+            apiBridge.showNotification('Failed to process payment', 'error');
+            console.error(error);
+        });
+}
+
+// Function to add a new patient
+window.addNewPatient = function() {
+    // Create a patient form
+    const formHTML = `
+        <form id="add-patient-form" class="patient-form">
+            <h3>Add New Patient</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="patient-name">Full Name</label>
+                    <input type="text" id="patient-name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="patient-age">Age</label>
+                    <input type="number" id="patient-age" class="form-control" min="1" max="120" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="patient-gender">Gender</label>
+                    <select id="patient-gender" class="form-control" required>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="patient-section">Section</label>
+                    <select id="patient-section" class="form-control" required>
+                        <option value="">Select Section</option>
+                        <option value="Men's Section">Men's Section</option>
+                        <option value="Women's Section">Women's Section</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="patient-phone">Phone</label>
+                    <input type="tel" id="patient-phone" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="patient-email">Email</label>
+                    <input type="email" id="patient-email" class="form-control" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="patient-address">Address</label>
+                <input type="text" id="patient-address" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="patient-medical-history">Medical History</label>
+                <textarea id="patient-medical-history" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="cancelAddPatient()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Patient</button>
+            </div>
+        </form>
+    `;
+    
+    // Find or create patient modal
+    let patientModal = document.getElementById('patient-modal');
+    if (!patientModal) {
+        patientModal = document.createElement('div');
+        patientModal.id = 'patient-modal';
+        patientModal.className = 'modal';
+        document.body.appendChild(patientModal);
+        
+        // Style the modal
+        patientModal.style.position = 'fixed';
+        patientModal.style.top = '0';
+        patientModal.style.left = '0';
+        patientModal.style.width = '100%';
+        patientModal.style.height = '100%';
+        patientModal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        patientModal.style.display = 'flex';
+        patientModal.style.alignItems = 'center';
+        patientModal.style.justifyContent = 'center';
+        patientModal.style.zIndex = '9999';
+    }
+    
+    // Set content and show
+    patientModal.innerHTML = `
+        <div class="modal-content" style="background: white; padding: 20px; border-radius: 8px; max-width: 800px; width: 100%;">
+            ${formHTML}
+        </div>
+    `;
+    patientModal.style.display = 'flex';
+    
+    // Add form submit handler
+    document.getElementById('add-patient-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Create patient object from form
+        const newPatient = {
+            name: document.getElementById('patient-name').value,
+            age: parseInt(document.getElementById('patient-age').value),
+            gender: document.getElementById('patient-gender').value,
+            section: document.getElementById('patient-section').value,
+            phone: document.getElementById('patient-phone').value,
+            email: document.getElementById('patient-email').value,
+            address: document.getElementById('patient-address').value,
+            medicalHistory: document.getElementById('patient-medical-history').value,
+            lastVisitDate: new Date().toISOString().split('T')[0], // Today as first visit
+            treatment: '' // Empty for new patient
+        };
+        
+        // Add patient to data
+        apiBridge.addPatient(newPatient)
+            .then(patient => {
+                // Hide modal
+                cancelAddPatient();
+                
+                // Refresh patient list
+                renderPatientListTable();
+                
+                // Show notification
+                apiBridge.showNotification('Patient added successfully', 'success');
+            })
+            .catch(error => {
+                apiBridge.showNotification('Failed to add patient', 'error');
+                console.error(error);
+            });
+    });
+}
+
+// Function to cancel add patient
+window.cancelAddPatient = function() {
+    const modal = document.getElementById('patient-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Function to add a new appointment
+window.addNewAppointment = function() {
+    // Create an appointment form
+    const formHTML = `
+        <form id="add-appointment-form" class="appointment-form">
+            <h3>Schedule New Appointment</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="appointment-patient">Patient</label>
+                    <select id="appointment-patient" class="form-control" required>
+                        <option value="">Select Patient</option>
+                        ${window.allDemoPatients.map(p => `
+                            <option value="${p.id}" data-section="${p.section}">${p.name}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-section">Section</label>
+                    <select id="appointment-section" class="form-control" required>
+                        <option value="">Select Section</option>
+                        <option value="Men's Section">Men's Section</option>
+                        <option value="Women's Section">Women's Section</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="appointment-date">Date</label>
+                    <input type="date" id="appointment-date" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-time">Time</label>
+                    <input type="time" id="appointment-time" class="form-control" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="appointment-treatment">Treatment</label>
+                    <select id="appointment-treatment" class="form-control" required>
+                        <option value="">Select Treatment</option>
+                        ${window.allDemoTreatments.map(t => `
+                            <option value="${t.value}">${t.text}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="appointment-doctor">Doctor</label>
+                    <select id="appointment-doctor" class="form-control" required>
+                        <option value="">Select Doctor</option>
+                        ${window.allDemoStaff.filter(s => s.role.includes('Dentist') || s.role.includes('Endodontist') || s.role.includes('Orthodontist') || s.role.includes('Surgeon')).map(d => `
+                            <option value="${d.id}" data-name="${d.name}">${d.name}</option>
+                        `).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="appointment-notes">Notes</label>
+                <textarea id="appointment-notes" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="cancelAddAppointment()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Schedule Appointment</button>
+            </div>
+        </form>
+    `;
+    
+    // Find or create appointment modal
+    let appointmentModal = document.getElementById('appointment-modal');
+    if (!appointmentModal) {
+        appointmentModal = document.createElement('div');
+        appointmentModal.id = 'appointment-modal';
+        appointmentModal.className = 'modal';
+        document.body.appendChild(appointmentModal);
+        
+        // Style the modal
+        appointmentModal.style.position = 'fixed';
+        appointmentModal.style.top = '0';
+        appointmentModal.style.left = '0';
+        appointmentModal.style.width = '100%';
+        appointmentModal.style.height = '100%';
+        appointmentModal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        appointmentModal.style.display = 'flex';
+        appointmentModal.style.alignItems = 'center';
+        appointmentModal.style.justifyContent = 'center';
+        appointmentModal.style.zIndex = '9999';
+    }
+    
+    // Set content and show
+    appointmentModal.innerHTML = `
+        <div class="modal-content" style="background: white; padding: 20px; border-radius: 8px; max-width: 800px; width: 100%;">
+            ${formHTML}
+        </div>
+    `;
+    appointmentModal.style.display = 'flex';
+    
+    // Set today as the default date
+    document.getElementById('appointment-date').valueAsDate = new Date();
+    
+    // Update section based on patient selection
+    document.getElementById('appointment-patient').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const section = selectedOption.dataset.section;
+            document.getElementById('appointment-section').value = section || '';
+        }
+    });
+    
+    // Add form submit handler
+    document.getElementById('add-appointment-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Get selected patient and doctor info
+        const patientSelect = document.getElementById('appointment-patient');
+        const patientId = patientSelect.value;
+        const patientName = patientSelect.options[patientSelect.selectedIndex].text;
+        
+        const doctorSelect = document.getElementById('appointment-doctor');
+        const doctorId = doctorSelect.value;
+        const doctorName = doctorSelect.options[doctorSelect.selectedIndex].text;
+        
+        // Create appointment object from form
+        const newAppointment = {
+            patientId: patientId,
+            patient: patientName,
+            section: document.getElementById('appointment-section').value,
+            date: document.getElementById('appointment-date').value,
+            time: document.getElementById('appointment-time').value,
+            treatment: document.getElementById('appointment-treatment').value,
+            doctorId: doctorId,
+            doctor: doctorName,
+            status: 'Confirmed',
+            notes: document.getElementById('appointment-notes').value
+        };
+        
+        // Add appointment to data
+        apiBridge.addAppointment(newAppointment)
+            .then(appointment => {
+                // Hide modal
+                cancelAddAppointment();
+                
+                // Refresh appointment list
+                renderAppointmentListTable();
+                
+                // If appointment is for today, refresh the today appointments table
+                const today = new Date().toISOString().split('T')[0];
+                if (appointment.date === today) {
+                    renderTodayAppointmentsTable();
+                }
+                
+                // Show notification
+                apiBridge.showNotification('Appointment scheduled successfully', 'success');
+            })
+            .catch(error => {
+                apiBridge.showNotification('Failed to schedule appointment', 'error');
+                console.error(error);
+            });
+    });
+}
+
+// Function to cancel add appointment
+window.cancelAddAppointment = function() {
+    const modal = document.getElementById('appointment-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// --- Function to Activate a Tab in a Section ---
+window.activateTab = function(sectionId, tabId) {
+    // First, store the active tab ID for this section
+    window.currentTab[sectionId] = tabId;
+    
+    // Next, hide all tab contents
+    const tabContents = document.querySelectorAll(`#${sectionId} .tab-content`);
+    tabContents.forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    // Then, remove active class from all tabs
+    const tabs = document.querySelectorAll(`#${sectionId} .tab-link`);
+    tabs.forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Finally, activate the selected tab
+    const selectedTabContent = document.getElementById(tabId);
+    if (selectedTabContent) {
+        selectedTabContent.classList.add('active');
+    }
+    
+    const selectedTab = document.querySelector(`#${sectionId} .tab-link[data-tab="${tabId}"]`);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+}
+
+// --- Event Listeners and Initial Setup ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Load data from API or use dummy data
+    apiBridge.loadPatients().then(patients => window.allDemoPatients = patients);
+    apiBridge.loadAppointments().then(appointments => window.allDemoAppointments = appointments);
+    
+    // Update UI based on role (show/hide elements, set up menu items)
+    updateUIState();
+    setupMenuItems();
+    
+    // Set up event listeners for tabs
+    const tabLinks = document.querySelectorAll('.tab-link');
+    tabLinks.forEach(tabLink => {
+        tabLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const tabId = this.getAttribute('data-tab');
+            const sectionId = this.closest('.content-section').id;
+            activateTab(sectionId, tabId);
+        });
+    });
+    
+    // Show dashboard by default
+    showSection('dashboard');
+    
+    // Set up other event listeners
+    setupEventListeners();
+    
+    // Initialize components
+    initializeComponents();
+    
+    // Populates all dropdowns with data
+    populateDropdowns();
+});
+
+// Function to initialize components
+function initializeComponents() {
+    // Initialize date pickers if any
+    
+    // Initialize any third-party components
+    
+    // Set up focus trap for modals
+}
+
+// Function to set up event listeners
+function setupEventListeners() {
+    // Add event listeners for forms, buttons, etc.
+    
+    // For example:
+    const addPatientBtn = document.querySelector('.add-patient-btn');
+    if (addPatientBtn) {
+        addPatientBtn.addEventListener('click', addNewPatient);
+    }
+    
+    const addAppointmentBtn = document.querySelector('.add-appointment-btn');
+    if (addAppointmentBtn) {
+        addAppointmentBtn.addEventListener('click', addNewAppointment);
+    }
+}

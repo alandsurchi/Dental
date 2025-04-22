@@ -1,0 +1,23 @@
+{
+  "name": "alan-dental-clinic",
+  "version": "1.0.0",
+  "description": "Alan Dental Clinic Management System",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s ."
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "keywords": [
+    "dental",
+    "clinic",
+    "management",
+    "healthcare"
+  ],
+  "author": "Alan Fahmi",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  }
+} 

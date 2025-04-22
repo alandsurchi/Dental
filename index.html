@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALAN DENTAL CLINIC</title>
+    <script>
+        // Check if the user is already logged in
+        const storedRole = sessionStorage.getItem('currentUserRole');
+        
+        // Redirect based on login status
+        if (storedRole && storedRole !== 'loggedOut') {
+            // User is logged in, redirect to main application
+            window.location.replace('dental_clinic.html');
+        } else {
+            // User is not logged in, redirect to login page
+            window.location.replace('login.html');
+        }
+    </script>
+</head>
+<body>
+    <div style="text-align: center; padding-top: 100px;">
+        <h1>ALAN DENTAL CLINIC</h1>
+        <p>Redirecting you to the application...</p>
+    </div>
+</body>
+</html> 
