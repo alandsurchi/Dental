@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ALAN DENTAL CLINIC</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-box">
+            <h2>ALAN DENTAL CLINIC</h2>
+            <h3>Management System</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Email</label>
+                    <input type="email" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div id="loginErrors" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Supabase client -->
+    <script type="module">
+        import * as supabaseClient from './supabase.js';
+        window.supabaseClient = supabaseClient;
+    </script>
+
+    <!-- Load login script as a module -->
+    <script type="module" src="login.js"></script>
+</body>
+</html>

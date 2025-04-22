@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALAN DENTAL CLINIC - Management System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Link to the separate CSS file -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Add Supabase client -->
+    <script type="module">
+        import * as supabaseClient from './supabase.js';
+        window.supabaseClient = supabaseClient;
+    </script>
+
+    <!-- Link the main script as a module -->
+    <script type="module" src="script.js"></script>
+    
+    <!-- IMPORTANT: Add initial redirect check after script loads but before rendering -->
+    <script type="module">
+        // Check sessionStorage IMMEDIATELY on page load before DOMContentLoaded
+        const storedRoleForRedirect = sessionStorage.getItem('currentUserRole');
+        // If no role stored OR role is explicitly 'loggedOut' (shouldn't be stored 'loggedOut' normally)
+        if (!storedRoleForRedirect || storedRoleForRedirect === '' || storedRoleForRedirect === 'loggedOut') {
+             console.log('dental_clinic.html: No user role found in sessionStorage, redirecting to login.');
+            window.location.href = 'login.html'; // Redirect to login page
+            // Prevent further execution of the script on this page until redirect happens
+             throw new Error("Redirecting to login..."); // Halt script execution
+        } else {
+             console.log(`dental_clinic.html: User role '${storedRoleForRedirect}' found. Proceeding.`);
+             // The global currentUserRole in script.js will be set by this value when script.js executes fully.
+        }
+    </script>
+
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3>ALAN DENTAL CLINIC</h3>
+                <p>Management System</p>
+            </div>
+             <!-- Added data-role attributes for easier targeting -->
+             <!-- Removed Logout menu item - handled by header button -->
+            <div class="menu-item" onclick="showSection('dashboard')" data-role="admin,receptionist,dentist"> <!-- Only visible when logged in -->
+                <i class="fas fa-th-large"></i>
+                <span>Dashboard</span>
+            </div>
+            <div class="menu-item" onclick="showSection('patients')" data-role="admin,receptionist,dentist"> <!-- All roles can see patients -->
+                <i class="fas fa-user"></i>
+                <span>Patients</span>
+            </div>
+            <div class="menu-item" onclick="showSection('appointments')" data-role="admin,receptionist,dentist"> <!-- All roles can see appointments -->
+                <i class="far fa-calendar-alt"></i>
+                <span>Appointments</span>
+            </div>
+             <div class="menu-item" onclick="showSection('dental-charting')" data-role="dentist,admin">
+                <i class="fas fa-tooth"></i>
+                <span>Dental Charting</span>
+            </div>
+             <div class="menu-item" onclick="showSection('billing')" data-role="admin,receptionist">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <span>Billing</span>
+            </div>
+             <div class="menu-item" onclick="showSection('staff')" data-role="admin">
+                <i class="fas fa-user-md"></i>
+                <span>Staff List</span>
+            </div>
+             <div class="menu-item" onclick="showSection('treatments')" data-role="admin,dentist">
+                <i class="fas fa-procedures"></i>
+                <span>Treatments</span>
+            </div>
+             <div class="menu-item" onclick="showSection('payment-methods')" data-role="admin">
+                <i class="far fa-credit-card"></i>
+                <span>Payment Methods</span>
+            </div>
+             <div class="menu-item" onclick="showSection('reports')" data-role="admin">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reports</span>
+            </div>
+            <!-- The Login links would typically only appear in the logged-out state UI, not here -->
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <h2 id="section-title"></h2> <!-- Empty initially -->
+                </div>
+                 <div class="header-controls"> <!-- Wrap user info and logout button -->
+                      <!-- Removed login-buttons div - handled by login.html -->
+                     <div class="user-info"> <!-- Always show this div now, JS will manage visibility -->
+                         <img src="https://placehold.co/40x40" alt="User Avatar">
+                         <div>
+                             <h4 id="userName"></h4> <!-- Empty initially -->
+                             <span id="userRole"></span> <!-- Empty initially -->
+                         </div>
+                         <!-- Added Logout Button -->
+                         <button class="btn btn-sm ml-2" onclick="logout()" id="headerLogoutBtn">Logout</button>
+                     </div>
+                 </div>
+            </div>
+
+            <!-- Dashboard Section (Enhanced) -->
+            <!-- Removed 'active' class -->
+            <div id="dashboard" class="content-section">
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon patients">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-value">1,254</div>
+                        <div class="stat-label">Total Patients</div>
+                        <div class="stat-trend up">
+                            <i class="fas fa-arrow-up"></i> 12% from last month
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon appointments">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-value">28</div>
+                        <div class="stat-label">Today's Appointments</div>
+                        <div class="stat-trend up">
+                            <i class="fas fa-arrow-up"></i> 5% from yesterday
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon revenue">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-value">$12,845</div>
+                        <div class="stat-label">Monthly Revenue</div>
+                        <div class="stat-trend up">
+                            <i class="fas fa-arrow-up"></i> 8% from last month
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon treatments">
+                            <i class="fas fa-procedures"></i>
+                        </div>
+                        <div class="stat-value">156</div>
+                        <div class="stat-label">Completed Treatments</div>
+                        <div class="stat-trend down">
+                            <i class="fas fa-arrow-down"></i> 3% from last month
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <div class="card-header">
+                            <h3>Revenue Overview</h3>
+                            <div class="chart-period">
+                                <span class="period-option active" onclick="changeChartPeriod(this, 'weekly')">Weekly</span>
+                                <span class="period-option" onclick="changeChartPeriod(this, 'monthly')">Monthly</span>
+                                <span class="period-option" onclick="changeChartPeriod(this, 'yearly')">Yearly</span>
+                            </div>
+                        </div>
+                        <div class="chart-container" id="revenueChart">
+                            <div style="text-align: center;">
+                                <i class="fas fa-chart-line" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                                <p>Revenue Chart Visualization</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="card-header">
+                            <h3>Treatment Distribution</h3>
+                        </div>
+                        <div class="chart-container" id="treatmentChart">
+                            <div style="text-align: center;">
+                                <i class="fas fa-chart-pie" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                                <p>Treatment Distribution Chart</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Today's Appointments</h3>
+                        <button class="btn" onclick="showSection('appointments')">View All</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Patient</th>
+                                    <th>Section</th>
+                                    <th>Treatment Type</th>
+                                    <th>Doctor</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="todayAppointmentsTable">
+                                <!-- Data rows kept for initial demo view, but dynamic rendering preferred -->
+                                <!-- Note: Actual rendering should populate this tbody based on live/dummy data -->
+                                <!-- The data-id attributes below are added for JS targeting -->
+                                <tr data-id="A001">
+                                    <td>09:00 AM</td>
+                                    <td>Sarah Johnson</td>
+                                    <td>Women's Section</td>
+                                    <td>Dental Cleaning</td>
+                                    <td>Dr. ALAN FAHMI</td>
+                                    <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                    <td>
+                                        <button class="btn" onclick="checkInAppointment(this)">Check In</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="A002">
+                                    <td>10:30 AM</td>
+                                    <td>Michael Brown</td>
+                                    <td>Men's Section</td>
+                                    <td>Root Canal</td>
+                                    <td>Dr. ALI ENZAR</td>
+                                    <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                    <td>
+                                        <button class="btn" onclick="checkInAppointment(this)">Check In</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="A003">
+                                    <td>11:45 AM</td>
+                                    <td>Emily Davis</td>
+                                    <td>Women's Section</td>
+                                    <td>Consultation</td>
+                                    <td>Dr. MUHAMMAD ENZAR</td>
+                                    <td><span class="status-badge status-pending">Pending</span></td>
+                                    <td>
+                                        <button class="btn" onclick="checkInAppointment(this)">Check In</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="A004">
+                                    <td>02:15 PM</td>
+                                    <td>Robert Wilson</td>
+                                    <td>Men's Section</td>
+                                    <td>Tooth Extraction</td>
+                                    <td>Dr. ALI RAJO</td>
+                                    <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                    <td>
+                                        <button class="btn" onclick="checkInAppointment(this)">Check In</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="dashboard-bottom">
+                    <div class="card recent-activity">
+                        <div class="card-header">
+                            <h3>Recent Activity</h3>
+                            <button class="btn btn-sm">View All</button>
+                        </div>
+                        <div class="activity-list">
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-user-plus"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <div class="activity-title">New Patient Registered</div>
+                                    <div class="activity-desc">Jennifer Lee registered as a new patient</div>
+                                    <div class="activity-time">2 hours ago</div>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-calendar-plus"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <div class="activity-title">Appointment Scheduled</div>
+                                    <div class="activity-desc">Michael Brown scheduled for Root Canal</div>
+                                    <div class="activity-time">3 hours ago</div>
+                                </div>
+                            </div>
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div class="activity-details">
+                                    <div class="activity-title">Payment Received</div>
+                                    <div class="activity-desc">$450 received from Sarah Johnson</div>
+                                    <div class="activity-time">5 hours ago</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card notifications">
+                        <div class="card-header">
+                            <h3>Notifications</h3>
+                            <button class="btn btn-sm" onclick="markAllNotificationsRead()">Mark All Read</button>
+                        </div>
+                        <div class="notification-list">
+                            <div class="notification-item unread">
+                                <div class="notification-icon">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </div>
+                                <div class="notification-details">
+                                    <div class="notification-title">Low Inventory Alert</div>
+                                    <div class="notification-desc">Dental composite materials are running low</div>
+                                    <div class="notification-time">1 hour ago</div>
+                                </div>
+                            </div>
+                            <div class="notification-item">
+                                <div class="notification-icon">
+                                    <i class="fas fa-calendar-times"></i>
+                                </div>
+                                <div class="notification-details">
+                                    <div class="notification-title">Appointment Cancelled</div>
+                                    <div class="notification-desc">Robert Wilson cancelled his appointment</div>
+                                    <div class="notification-time">Yesterday</div>
+                                </div>
+                            </div>
+                            <div class="notification-item">
+                                <div class="notification-icon">
+                                    <i class="fas fa-bell"></i>
+                                </div>
+                                <div class="notification-details">
+                                    <div class="notification-title">Staff Meeting Reminder</div>
+                                    <div class="notification-desc">Monthly staff meeting tomorrow at 9 AM</div>
+                                    <div class="notification-time">Yesterday</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patient Management Section -->
+            <div id="patients" class="content-section">
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('patient-list', this)">Patient List</div>
+                    <div class="tab" onclick="showTab('add-patient', this)">Add New Patient</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="patient-list" class="tab-content">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Search patients..." id="patientSearchInput" onkeyup="searchPatients()">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Patient List</h3>
+                            <button class="btn" onclick="showTab('add-patient', document.querySelector('#patients .tabs .tab:nth-child(2)'))">Add New Patient</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Age</th>
+                                        <th>Section</th>
+                                        <th>Treatment Type</th>
+                                        <th>Last Visit</th>
+                                        <th>Doctor</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="patientTableBody">
+                                    <!-- Data rows kept for initial demo view -->
+                                    <tr data-id="P001">
+                                        <td>P001</td>
+                                        <td>Sarah Johnson</td>
+                                        <td>35</td>
+                                        <td>Women's Section</td>
+                                        <td>Disease Treatment</td>
+                                        <td>15 Feb 2023</td>
+                                        <td>Dr. ALAN FAHMI</td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editPatient('P001')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deletePatient('P001')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="P002">
+                                        <td>P002</td>
+                                        <td>Michael Brown</td>
+                                        <td>42</td>
+                                        <td>Men's Section</td>
+                                        <td>Disease Treatment</td>
+                                        <td>10 Mar 2023</td>
+                                        <td>Dr. ALI ENZAR</td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editPatient('P002')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deletePatient('P002')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="P003">
+                                        <td>P003</td>
+                                        <td>Emily Davis</td>
+                                        <td>28</td>
+                                        <td>Women's Section</td>
+                                        <td>Cosmetic Treatment</td>
+                                        <td>22 Mar 2023</td>
+                                        <td>Dr. MUHAMMAD ENZAR</td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editPatient('P003')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deletePatient('P003')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="P004">
+                                        <td>P004</td>
+                                        <td>Robert Wilson</td>
+                                        <td>45</td>
+                                        <td>Men's Section</td>
+                                        <td>Disease Treatment</td>
+                                        <td>05 Apr 2023</td>
+                                        <td>Dr. ALI RAJO</td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editPatient('P004')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deletePatient('P004')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="P005">
+                                        <td>P005</td>
+                                        <td>Jennifer Lee</td>
+                                        <td>32</td>
+                                        <td>Women's Section</td>
+                                        <td>Cosmetic Treatment</td>
+                                        <td>18 Apr 2023</td>
+                                        <td>Dr. ALAND RAED</td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editPatient('P005')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deletePatient('P005')">Delete</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="add-patient" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="patientFormTitle">Add New Patient</h3>
+                        </div>
+                        <form id="patientForm" onsubmit="savePatient(event)">
+                            <input type="hidden" id="patientId" value="">
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientName">Full Name</label>
+                                        <input type="text" id="patientName" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientAge">Age</label>
+                                        <input type="number" id="patientAge" class="form-control" required min="1" max="120">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientGender">Gender</label>
+                                        <select id="patientGender" class="form-control" required>
+                                            <option value="">Select Gender</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientPhone">Phone Number</label>
+                                        <input type="tel" id="patientPhone" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="patientEmail">Email Address</label>
+                                <input type="email" id="patientEmail" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="patientAddress">Address</label>
+                                <textarea id="patientAddress" class="form-control" rows="3"></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientSection">Section</label>
+                                        <select id="patientSection" class="form-control" required>
+                                            <option value="">Select Section</option>
+                                            <option value="Men's Section">Men's Section</option>
+                                            <option value="Women's Section">Women's Section</option>
+                                            <option value="Children's Section">Children's Section</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="patientTreatment">Treatment Type</label>
+                                        <select id="patientTreatment" class="form-control" required>
+                                            <option value="">Select Treatment Type</option>
+                                            <option value="Disease Treatment">Disease Treatment</option>
+                                            <option value="Cosmetic Treatment">Cosmetic Treatment</option>
+                                            <option value="Preventive Care">Preventive Care</option>
+                                            <option value="Orthodontics">Orthodontics</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="patientMedicalHistory">Medical History</label>
+                                <textarea id="patientMedicalHistory" class="form-control" rows="4"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Patient</button>
+                                <button type="button" class="btn" onclick="resetPatientForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appointments Section -->
+            <div id="appointments" class="content-section">
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('appointment-list', this)">Appointment List</div>
+                    <div class="tab" onclick="showTab('add-appointment', this)">Schedule Appointment</div>
+                    <div class="tab" onclick="showTab('calendar-view', this)">Calendar View</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="appointment-list" class="tab-content">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Search appointments..." id="appointmentSearchInput" onkeyup="searchAppointments()">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Upcoming Appointments</h3>
+                            <button class="btn" onclick="showTab('add-appointment', document.querySelector('#appointments .tabs .tab:nth-child(2)'))">Schedule Appointment</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Patient</th>
+                                        <th>Section</th>
+                                        <th>Treatment Type</th>
+                                        <th>Doctor</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="appointmentTableBody">
+                                    <!-- Initial data should be handled by JS load/rendering based on state -->
+                                    <!-- Leaving static rows here for basic load display, data-id added -->
+                                    <tr data-id="A001">
+                                        <td>06 Apr 2023</td>
+                                        <td>09:00 AM</td>
+                                        <td>Sarah Johnson</td>
+                                        <td>Women's Section</td>
+                                        <td>Dental Cleaning</td>
+                                        <td>Dr. ALAN FAHMI</td>
+                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A001')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A001')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="A002">
+                                        <td>06 Apr 2023</td>
+                                        <td>10:30 AM</td>
+                                        <td>Michael Brown</td>
+                                        <td>Men's Section</td>
+                                        <td>Root Canal</td>
+                                        <td>Dr. ALI ENZAR</td>
+                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A002')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A002')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="A003">
+                                        <td>06 Apr 2023</td>
+                                        <td>11:45 AM</td>
+                                        <td>Emily Davis</td>
+                                        <td>Women's Section</td>
+                                        <td>Consultation</td>
+                                        <td>Dr. MUHAMMAD ENZAR</td>
+                                        <td><span class="status-badge status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A003')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A003')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="A004">
+                                        <td>06 Apr 2023</td>
+                                        <td>02:15 PM</td>
+                                        <td>Robert Wilson</td>
+                                        <td>Men's Section</td>
+                                        <td>Tooth Extraction</td>
+                                        <td>Dr. ALI RAJO</td>
+                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A004')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A004')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="A005">
+                                        <td>07 Apr 2023</td>
+                                        <td>10:00 AM</td>
+                                        <td>Jennifer Lee</td>
+                                        <td>Women's Section</td>
+                                        <td>Teeth Whitening</td>
+                                        <td>Dr. ALAND RAED</td>
+                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A005')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A005')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                     <tr data-id="A006">
+                                        <td>15 Apr 2023</td>
+                                        <td>11:00 AM</td>
+                                        <td>Sarah Johnson</td>
+                                        <td>Women's Section</td>
+                                        <td>Follow-up</td>
+                                        <td>Dr. ALAN FAHMI</td>
+                                        <td><span class="status-badge status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A006')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A006')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                     <tr data-id="A007">
+                                        <td>01 May 2023</td>
+                                        <td>09:30 AM</td>
+                                        <td>Michael Brown</td>
+                                        <td>Men's Section</td>
+                                        <td>Check-up</td>
+                                        <td>Dr. ALI ENZAR</td>
+                                        <td><span class="status-badge status-confirmed">Confirmed</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="editAppointment('A007')">Edit</button>
+                                            <button class="btn btn-danger btn-sm" onclick="cancelAppointment('A007')">Cancel</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="add-appointment" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="appointmentFormTitle">Schedule New Appointment</h3>
+                        </div>
+                        <form id="appointmentForm" onsubmit="saveAppointment(event)">
+                            <input type="hidden" id="appointmentId" value="">
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentPatient">Patient</label>
+                                        <select id="appointmentPatient" class="form-control" required>
+                                            <option value="">Select Patient</option>
+                                            <option value="P001">Sarah Johnson</option>
+                                            <option value="P002">Michael Brown</option>
+                                            <option value="P003">Emily Davis</option>
+                                            <option value="P004">Robert Wilson</option>
+                                            <option value="P005">Jennifer Lee</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentDoctor">Doctor</label>
+                                        <select id="appointmentDoctor" class="form-control" required>
+                                            <option value="">Select Doctor</option>
+                                            <!-- Staff options need to be populated by JS on load -->
+                                            <option value="D001">Dr. ALAN FAHMI</option>
+                                            <option value="D002">Dr. ALI ENZAR</option>
+                                            <option value="D003">Dr. MUHAMMAD ENZAR</option>
+                                            <option value="D004">Dr. ALI RAJO</option>
+                                            <option value="D005">Dr. ALAND RAED</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentDate">Date</label>
+                                        <input type="date" id="appointmentDate" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentTime">Time</label>
+                                        <input type="time" id="appointmentTime" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentSection">Section</label>
+                                        <select id="appointmentSection" class="form-control" required>
+                                            <option value="">Select Section</option>
+                                            <option value="Men's Section">Men's Section</option>
+                                            <option value="Women's Section">Women's Section</option>
+                                            <option value="Children's Section">Children's Section</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="appointmentTreatment">Treatment Type</label>
+                                        <select id="appointmentTreatment" class="form-control" required>
+                                            <option value="">Select Treatment Type</option>
+                                            <!-- Treatments options need to be populated by JS on load -->
+                                            <option value="Dental Cleaning">Dental Cleaning</option>
+                                            <option value="Root Canal">Root Canal</option>
+                                            <option value="Tooth Extraction">Tooth Extraction</option>
+                                            <option value="Teeth Whitening">Teeth Whitening</option>
+                                            <option value="Consultation">Consultation</option>
+                                            <option value="Filling">Filling</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="appointmentNotes">Notes</label>
+                                <textarea id="appointmentNotes" class="form-control" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Appointment</button>
+                                <button type="button" class="btn" onclick="resetAppointmentForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="calendar-view" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Appointment Calendar</h3>
+                        </div>
+                        <div class="calendar">
+                            <div class="calendar-header">
+                                <button class="btn" onclick="prevMonth()"><i class="fas fa-chevron-left"></i></button>
+                                <h4 id="currentMonth"></h4> <!-- Empty initially -->
+                                <button class="btn" onclick="nextMonth()"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <div class="calendar-days">
+                                <div class="calendar-day-header">Sun</div>
+                                <div class="calendar-day-header">Mon</div>
+                                <div class="calendar-day-header">Tue</div>
+                                <div class="calendar-day-header">Wed</div>
+                                <div class="calendar-day-header">Thu</div>
+                                <div class="calendar-day-header">Fri</div>
+                                <div class="calendar-day-header">Sat</div>
+                                <!-- Calendar days will be generated by JavaScript -->
+                            </div>
+                        </div>
+                        <div id="selectedDayAppointments" style="margin-top: 20px; display: none;">
+                            <h4 id="selectedDate"></h4> <!-- Empty initially -->
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Patient</th>
+                                            <th>Treatment Type</th>
+                                            <th>Doctor</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dayAppointmentsTable">
+                                        <!-- Day appointments will be populated by JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dental Charting Section -->
+            <div id="dental-charting" class="content-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Dental Chart</h3>
+                    </div>
+                    <div class="form-group">
+                        <label for="chartPatient">Select Patient</label>
+                        <select id="chartPatient" class="form-control" onchange="loadPatientChart()">
+                            <option value="">Select Patient</option>
+                             <!-- Patient options need to be populated by JS on load -->
+                            <option value="P001">Sarah Johnson</option>
+                            <option value="P002">Michael Brown</option>
+                            <option value="P003">Emily Davis</option>
+                            <option value="P004">Robert Wilson</option>
+                            <option value="P005">Jennifer Lee</option>
+                        </select>
+                         <span id="currentlySelectedTeeth" style="font-size: 0.9em; color: #555;">None Selected</span> <!-- Add element to show selected teeth -->
+                    </div>
+                    <div class="dental-chart">
+                        <h4>Adult Dentition</h4>
+                        <div class="teeth-row">
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="18">18</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="17">17</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="16">16</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="15">15</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="14">14</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="13">13</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="12">12</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="11">11</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="21">21</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="22">22</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="23">23</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="24">24</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="25">25</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="26">26</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="27">27</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="28">28</div>
+                        </div>
+                        <div class="teeth-row">
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="48">48</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="47">47</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="46">46</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="45">45</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="44">44</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="43">43</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="42">42</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="41">41</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="31">31</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="32">32</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="33">33</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="34">34</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="35">35</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="36">36</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="37">37</div>
+                            <div class="tooth" onclick="selectTooth(this)" data-tooth="38">38</div>
+                        </div>
+                    </div>
+                    <div class="treatment-panel">
+                        <h4>Treatment Options</h4>
+                        <div class="treatment-options">
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="filling">Filling</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="extraction">Extraction</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="root-canal">Root Canal</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="crown">Crown</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="bridge">Bridge</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="implant">Implant</div>
+                            <div class="treatment-btn" onclick="selectTreatment(this)" data-treatment="veneer">Veneer</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="treatmentNotes">Treatment Notes</label>
+                            <textarea id="treatmentNotes" class="form-control" rows="3"></textarea>
+                        </div>
+                        <button class="btn btn-success" onclick="saveChart()">Save Chart</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Billing Section -->
+            <div id="billing" class="content-section">
+                <div class="billing-summary">
+                    <div class="summary-card">
+                        <h4>Total Revenue</h4>
+                        <div class="amount">\$45,678</div>
+                        <div class="period">This Year</div>
+                    </div>
+                    <div class="summary-card">
+                        <h4>Pending Payments</h4>
+                        <div class="amount">\$5,432</div>
+                        <div class="period">Outstanding</div>
+                    </div>
+                    <div class="summary-card">
+                        <h4>Completed Payments</h4>
+                        <div class="amount">\$3,245</div>
+                        <div class="period">This Month</div>
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('invoices', this)">Invoices</div>
+                    <div class="tab" onclick="showTab('create-invoice', this)">Create Invoice</div>
+                    <div class="tab" onclick="showTab('payment-history', this)">Payment History</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="invoices" class="tab-content">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Search invoices..." id="invoiceSearchInput" onkeyup="searchInvoices()">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Recent Invoices</h3>
+                            <button class="btn" onclick="showTab('create-invoice', document.querySelector('#billing .tabs .tab:nth-child(2)'))">Create Invoice</button>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Patient</th>
+                                        <th>Date</th>
+                                        <th>Treatment</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoiceTableBody">
+                                     <!-- Static data rows -->
+                                    <tr data-id="INV001">
+                                        <td>INV001</td>
+                                        <td>Sarah Johnson</td>
+                                        <td>15 Feb 2023</td>
+                                        <td>Dental Cleaning</td>
+                                        <td>\$150</td>
+                                        <td><span class="status-badge status-confirmed">Paid</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="viewInvoice('INV001')">View</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('INV001')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="INV002">
+                                        <td>INV002</td>
+                                        <td>Michael Brown</td>
+                                        <td>10 Mar 2023</td>
+                                        <td>Root Canal</td>
+                                        <td>\$850</td>
+                                        <td><span class="status-badge status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="viewInvoice('INV002')">View</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('INV002')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="INV003">
+                                        <td>INV003</td>
+                                        <td>Emily Davis</td>
+                                        <td>22 Mar 2023</td>
+                                        <td>Consultation</td>
+                                        <td>\$75</td>
+                                        <td><span class="status-badge status-confirmed">Paid</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="viewInvoice('INV003')">View</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('INV003')">Delete</button>
+                                        </td>
+                                    </tr>
+                                    <tr data-id="INV004">
+                                        <td>INV004</td>
+                                        <td>Robert Wilson</td>
+                                        <td>05 Apr 2023</td>
+                                        <td>Tooth Extraction</td>
+                                        <td>\$200</td>
+                                        <td><span class="status-badge status-pending">Pending</span></td>
+                                        <td>
+                                            <button class="btn btn-sm" onclick="viewInvoice('INV004')">View</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteInvoice('INV004')">Delete</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="create-invoice" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Create New Invoice</h3>
+                        </div>
+                        <form id="invoiceForm" onsubmit="saveInvoice(event)">
+                             <input type="hidden" id="invoiceId" value=""> <!-- Add this for editing functionality -->
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="invoicePatient">Patient</label>
+                                        <select id="invoicePatient" class="form-control" required>
+                                            <option value="">Select Patient</option>
+                                            <!-- Patient options need to be populated by JS on load -->
+                                            <option value="P001">Sarah Johnson</option>
+                                            <option value="P002">Michael Brown</option>
+                                            <option value="P003">Emily Davis</option>
+                                            <option value="P004">Robert Wilson</option>
+                                            <option value="P005">Jennifer Lee</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="invoiceDate">Date</label>
+                                        <input type="date" id="invoiceDate" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="invoiceTreatment">Treatment</label>
+                                        <select id="invoiceTreatment" class="form-control" required>
+                                            <option value="">Select Treatment</option>
+                                            <!-- Treatments options need to be populated by JS on load -->
+                                            <option value="Dental Cleaning">Dental Cleaning</option>
+                                            <option value="Root Canal">Root Canal</option>
+                                            <option value="Tooth Extraction">Tooth Extraction</option>
+                                            <option value="Teeth Whitening">Teeth Whitening</option>
+                                            <option value="Consultation">Consultation</option>
+                                            <option value="Filling">Filling</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="invoiceAmount">Amount ($)</label>
+                                        <input type="number" id="invoiceAmount" class="form-control" required min="1" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                             <!-- Added Payment Status -->
+                             <div class="form-row">
+                                 <div class="form-col">
+                                      <div class="form-group">
+                                           <label for="invoiceStatus">Payment Status</label>
+                                          <select id="invoiceStatus" class="form-control" required>
+                                               <option value="Pending">Pending</option>
+                                               <option value="Paid">Paid</option>
+                                          </select>
+                                       </div>
+                                 </div>
+                                  <div class="form-col">
+                                       <div class="form-group">
+                                            <label for="invoicePaymentMethod">Payment Method (if Paid)</label>
+                                           <select id="invoicePaymentMethod" class="form-control">
+                                                <option value="">Select Method</option>
+                                                <!-- Payment methods populated by JS on load -->
+                                                 <option value="Cash">Cash</option>
+                                                 <option value="Credit Card">Credit Card</option>
+                                                 <option value="Insurance">Insurance</option>
+                                           </select>
+                                        </div>
+                                   </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="invoiceNotes">Notes</label>
+                                <textarea id="invoiceNotes" class="form-control" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Invoice</button> <!-- Changed from Create to Save -->
+                                <button type="button" class="btn" onclick="resetInvoiceForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="payment-history" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Payment History</h3>
+                             <!-- Optionally add filter/search for payments -->
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Payment ID</th>
+                                        <th>Invoice #</th>
+                                        <th>Patient</th>
+                                        <th>Date</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="paymentHistoryTableBody">
+                                     <!-- Static data rows -->
+                                    <tr>
+                                        <td>PMT001</td>
+                                        <td>INV001</td>
+                                        <td>Sarah Johnson</td>
+                                        <td>15 Feb 2023</td>
+                                        <td>\$150</td>
+                                        <td>Credit Card</td>
+                                    </tr>
+                                    <tr>
+                                        <td>PMT002</td>
+                                        <td>INV003</td>
+                                        <td>Emily Davis</td>
+                                        <td>22 Mar 2023</td>
+                                        <td>\$75</td>
+                                        <td>Cash</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Staff List Section -->
+            <div id="staff" class="content-section">
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('staff-list', this)">Staff List</div>
+                    <div class="tab" onclick="showTab('add-staff', this)">Add New Staff</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="staff-list" class="tab-content">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Search staff..." id="staffSearchInput" onkeyup="searchStaff()">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+
+                    <div class="staff-grid" id="staffGrid">
+                         <!-- Static staff cards -->
+                        <div class="staff-card" data-id="D001">
+                            <div class="staff-header">
+                                <img src="https://placehold.co/100x100/7b68ee/ffffff" alt="Staff Photo" class="staff-photo"> <!-- Placeholder matches user avatar color -->
+                                <div class="staff-name">Dr. ALAN FAHMI</div>
+                                <div class="staff-role">Dentist</div>
+                            </div>
+                            <div class="staff-body">
+                                <div class="staff-info">
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div>alan.fahmi@alandental.com</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-phone"></i></div>
+                                        <div>+1 (555) 123-4567</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-user-md"></i></div>
+                                        <div>General Dentistry</div>
+                                    </div>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm" onclick="editStaff('D001')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteStaff('D001')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="staff-card" data-id="D002">
+                            <div class="staff-header">
+                                <img src="https://placehold.co/100x100/2ecc71/ffffff" alt="Staff Photo" class="staff-photo"> <!-- Placeholder matches user avatar color -->
+                                <div class="staff-name">Dr. ALI ENZAR</div>
+                                <div class="staff-role">Endodontist</div>
+                            </div>
+                            <div class="staff-body">
+                                <div class="staff-info">
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div>ali.enzar@alandental.com</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-phone"></i></div>
+                                        <div>+1 (555) 234-5678</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-user-md"></i></div>
+                                        <div>Root Canal Specialist</div>
+                                    </div>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm" onclick="editStaff('D002')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteStaff('D002')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="staff-card" data-id="D003">
+                            <div class="staff-header">
+                                <img src="https://placehold.co/100x100/f39c12/ffffff" alt="Staff Photo" class="staff-photo"> <!-- Placeholder matches user avatar color -->
+                                <div class="staff-name">Dr. MUHAMMAD ENZAR</div>
+                                <div class="staff-role">Orthodontist</div>
+                            </div>
+                            <div class="staff-body">
+                                <div class="staff-info">
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div>muhammad.enzar@alandental.com</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-phone"></i></div>
+                                        <div>+1 (555) 345-6789</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-user-md"></i></div>
+                                        <div>Braces Specialist</div>
+                                    </div>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm" onclick="editStaff('D003')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteStaff('D003')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="staff-card" data-id="D004">
+                            <div class="staff-header">
+                                <img src="https://placehold.co/100x100/3498db/ffffff" alt="Staff Photo" class="staff-photo"> <!-- Use info color -->
+                                <div class="staff-name">Dr. ALI RAJO</div>
+                                <div class="staff-role">Oral Surgeon</div>
+                            </div>
+                            <div class="staff-body">
+                                <div class="staff-info">
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div>ali.rajo@alandental.com</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-phone"></i></div>
+                                        <div>+1 (555) 456-7890</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-user-md"></i></div>
+                                        <div>Extraction Specialist</div>
+                                    </div>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm" onclick="editStaff('D004')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteStaff('D004')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="staff-card" data-id="D005">
+                            <div class="staff-header">
+                                <img src="https://placehold.co/100x100/1abc9c/ffffff" alt="Staff Photo" class="staff-photo"> <!-- Use emerald color -->
+                                <div class="staff-name">Dr. ALAND RAED</div>
+                                <div class="staff-role">Dentist</div>
+                            </div>
+                            <div class="staff-body">
+                                <div class="staff-info">
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-envelope"></i></div>
+                                        <div>aland.raed@alandental.com</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-phone"></i></div>
+                                        <div>+1 (555) 678-9012</div>
+                                    </div>
+                                    <div class="staff-info-item">
+                                        <div class="staff-info-icon"><i class="fas fa-user-md"></i></div>
+                                        <div>Cosmetic Dentistry</div>
+                                    </div>
+                                </div>
+                                <div class="staff-actions">
+                                    <button class="btn btn-sm" onclick="editStaff('D005')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteStaff('D005')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="add-staff" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="staffFormTitle">Add New Staff</h3>
+                        </div>
+                        <form id="staffForm" onsubmit="saveStaff(event)">
+                            <input type="hidden" id="staffId" value="">
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="staffName">Full Name</label>
+                                        <input type="text" id="staffName" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="staffRole">Role</label>
+                                        <select id="staffRole" class="form-control" required>
+                                            <option value="">Select Role</option>
+                                            <option value="Dentist">Dentist</option>
+                                            <option value="Endodontist">Endodontist</option>
+                                            <option value="Orthodontist">Orthodontist</option>
+                                            <option value="Oral Surgeon">Oral Surgeon</option>
+                                            <option value="Dental Hygienist">Dental Hygienist</option>
+                                            <option value="Receptionist">Receptionist</option>
+                                            <option value="Administrator">Administrator</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="staffEmail">Email</label>
+                                        <input type="email" id="staffEmail" class="form-control" required>
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="staffPhone">Phone</label>
+                                        <input type="tel" id="staffPhone" class="form-control" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="staffSpecialty">Specialty</label>
+                                <input type="text" id="staffSpecialty" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label for="staffAddress">Address</label>
+                                <textarea id="staffAddress" class="form-control" rows="3"></textarea>
+                            </div>
+                            <!-- Add dummy login fields for adding/editing staff if admin role can set them -->
+                            <!--
+                            <div class="form-group">
+                                 <label for="staffUsername">Username</label>
+                                 <input type="text" id="staffUsername" class="form-control"> // Might be required if staff login
+                             </div>
+                             <div class="form-group">
+                                  <label for="staffPassword">Password</label>
+                                 <input type="password" id="staffPassword" class="form-control"> // Only for adding, not shown on edit
+                            </div>
+                            -->
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Staff</button>
+                                <button type="button" class="btn" onclick="resetStaffForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Treatments Section -->
+            <div id="treatments" class="content-section">
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('treatment-list', this)">Treatment List</div>
+                    <div class="tab" onclick="showTab('add-treatment', this)">Add New Treatment</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="treatment-list" class="tab-content">
+                    <div class="search-bar">
+                        <input type="text" placeholder="Search treatments..." id="treatmentSearchInput" onkeyup="searchTreatments()">
+                        <button><i class="fas fa-search"></i></button>
+                    </div>
+
+                    <div id="treatmentsList">
+                         <!-- Static treatment cards (consider rendering from JS based on allDemoTreatments) -->
+                        <div class="treatment-card" data-value="Dental Cleaning">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Dental Cleaning</div>
+                                <div class="treatment-description">Professional cleaning to remove plaque and tartar buildup.</div>
+                                 <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Preventive</div> <!-- Added category -->
+                                <div class="treatment-price">\$150</div>
+                            </div>
+                            <div class="treatment-actions">
+                                 <!-- Pass treatment value (ID equiv) to functions -->
+                                <button class="btn btn-sm" onclick="editTreatment('Dental Cleaning')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Dental Cleaning')">Delete</button>
+                            </div>
+                        </div>
+                        <div class="treatment-card" data-value="Root Canal">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Root Canal</div>
+                                <div class="treatment-description">Procedure to remove infected pulp and relieve pain.</div>
+                                 <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Restorative</div> <!-- Added category -->
+                                <div class="treatment-price">\$850</div>
+                            </div>
+                            <div class="treatment-actions">
+                                <button class="btn btn-sm" onclick="editTreatment('Root Canal')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Root Canal')">Delete</button>
+                            </div>
+                        </div>
+                        <div class="treatment-card" data-value="Tooth Extraction">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Tooth Extraction</div>
+                                <div class="treatment-description">Removal of damaged or problematic teeth.</div>
+                                 <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Surgical</div> <!-- Added category -->
+                                <div class="treatment-price">\$200</div>
+                            </div>
+                            <div class="treatment-actions">
+                                <button class="btn btn-sm" onclick="editTreatment('Tooth Extraction')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Tooth Extraction')">Delete</button>
+                            </div>
+                        </div>
+                        <div class="treatment-card" data-value="Teeth Whitening">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Teeth Whitening</div>
+                                <div class="treatment-description">Professional whitening to remove stains and discoloration.</div>
+                                <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Cosmetic</div> <!-- Added category -->
+                                <div class="treatment-price">\$300</div>
+                            </div>
+                            <div class="treatment-actions">
+                                <button class="btn btn-sm" onclick="editTreatment('Teeth Whitening')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Teeth Whitening')">Delete</button>
+                            </div>
+                        </div>
+                         <div class="treatment-card" data-value="Consultation">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Consultation</div>
+                                <div class="treatment-description">Initial examination and discussion of dental needs.</div>
+                                <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Diagnostic</div> <!-- Added category -->
+                                <div class="treatment-price">\$75</div>
+                            </div>
+                            <div class="treatment-actions">
+                                <button class="btn btn-sm" onclick="editTreatment('Consultation')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Consultation')">Delete</button>
+                            </div>
+                        </div>
+                         <div class="treatment-card" data-value="Filling">
+                            <div class="treatment-icon">
+                                <i class="fas fa-tooth"></i>
+                            </div>
+                            <div class="treatment-details">
+                                <div class="treatment-name">Filling</div>
+                                <div class="treatment-description">Restoring tooth structure lost due to decay or fracture.</div>
+                                <div class="treatment-category" style="font-size: 12px; color: #888;">Category: Restorative</div> <!-- Added category -->
+                                <div class="treatment-price">\$100</div>
+                            </div>
+                            <div class="treatment-actions">
+                                <button class="btn btn-sm" onclick="editTreatment('Filling')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteTreatment('Filling')">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="add-treatment" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="treatmentFormTitle">Add New Treatment</h3>
+                        </div>
+                        <form id="treatmentForm" onsubmit="saveTreatment(event)">
+                             <input type="hidden" id="treatmentOriginalValue" value=""> <!-- Store original value for editing -->
+                            <div class="form-group">
+                                <label for="treatmentNewValue">Treatment Value (Unique Key, e.g., 'Dental Cleaning')</label>
+                                <input type="text" id="treatmentNewValue" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="treatmentName">Treatment Name (Display Name)</label>
+                                <input type="text" id="treatmentName" class="form-control" required>
+                            </div>
+                             <div class="form-group">
+                                 <label for="treatmentDescription">Description</label>
+                                <textarea id="treatmentDescription" class="form-control" rows="3" required></textarea>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="treatmentPrice">Price ($)</label>
+                                        <input type="number" id="treatmentPrice" class="form-control" required min="0" step="0.01">
+                                    </div>
+                                </div>
+                                <div class="form-col">
+                                    <div class="form-group">
+                                        <label for="treatmentDuration">Duration (minutes)</label>
+                                        <input type="number" id="treatmentDuration" class="form-control" required min="5" step="5">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="treatmentCategory">Category</label>
+                                <select id="treatmentCategory" class="form-control" required>
+                                    <option value="">Select Category</option>
+                                    <option value="Preventive">Preventive</option>
+                                    <option value="Restorative">Restorative</option>
+                                    <option value="Cosmetic">Cosmetic</option>
+                                    <option value="Surgical">Surgical</option>
+                                    <option value="Orthodontic">Orthodontic</option>
+                                     <option value="Diagnostic">Diagnostic</option>
+                                     <option value="Periodontal">Periodontal</option>
+                                     <option value="Prosthodontics">Prosthodontics</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Treatment</button>
+                                <button type="button" class="btn" onclick="resetTreatmentForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Methods Section -->
+            <div id="payment-methods" class="content-section">
+                <div class="tabs">
+                    <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('payment-method-list', this)">Payment Methods</div>
+                    <div class="tab" onclick="showTab('add-payment-method', this)">Add Payment Method</div>
+                </div>
+
+                <!-- Removed 'active' class -->
+                <div id="payment-method-list" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Available Payment Methods</h3>
+                            <button class="btn" onclick="showTab('add-payment-method', document.querySelector('#payment-methods .tabs .tab:nth-child(2)'))">Add Method</button>
+                        </div>
+                        <div id="paymentMethodsList">
+                             <!-- Static payment method cards -->
+                            <div class="payment-method-card" data-id="PM001">
+                                <div class="payment-method-icon">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div class="payment-method-details">
+                                    <h4>Cash</h4>
+                                    <p>Accept cash payments directly at the clinic</p>
+                                </div>
+                                <div class="payment-method-actions">
+                                    <button class="btn btn-sm" onclick="editPaymentMethod('PM001')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deletePaymentMethod('PM001')">Delete</button>
+                                </div>
+                            </div>
+                            <div class="payment-method-card" data-id="PM002">
+                                <div class="payment-method-icon">
+                                    <i class="far fa-credit-card"></i>
+                                </div>
+                                <div class="payment-method-details">
+                                    <h4>Credit Card</h4>
+                                    <p>Accept Visa, MasterCard, and American Express</p>
+                                </div>
+                                <div class="payment-method-actions">
+                                    <button class="btn btn-sm" onclick="editPaymentMethod('PM002')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deletePaymentMethod('PM002')">Delete</button>
+                                </div>
+                            </div>
+                            <div class="payment-method-card" data-id="PM003">
+                                <div class="payment-method-icon">
+                                    <i class="fas fa-file-medical"></i>
+                                </div>
+                                <div class="payment-method-details">
+                                    <h4>Insurance</h4>
+                                    <p>Process payments through dental insurance providers</p>
+                                </div>
+                                <div class="payment-method-actions">
+                                    <button class="btn btn-sm" onclick="editPaymentMethod('PM003')">Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deletePaymentMethod('PM003')">Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="add-payment-method" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 id="paymentMethodFormTitle">Add Payment Method</h3>
+                        </div>
+                        <form id="paymentMethodForm" onsubmit="savePaymentMethod(event)">
+                            <input type="hidden" id="paymentMethodId" value="">
+                            <div class="form-group">
+                                <label for="paymentMethodName">Method Name</label>
+                                <input type="text" id="paymentMethodName" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="paymentMethodDescription">Description</label>
+                                <textarea id="paymentMethodDescription" class="form-control" rows="3" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="paymentMethodIcon">Icon</label>
+                                <select id="paymentMethodIcon" class="form-control" required>
+                                    <option value="">Select Icon</option>
+                                    <option value="fas fa-money-bill-wave">Cash</option>
+                                    <option value="far fa-credit-card">Credit Card</option>
+                                    <option value="fas fa-file-medical">Insurance</option>
+                                    <option value="fab fa-paypal">PayPal</option>
+                                    <option value="fas fa-mobile-alt">Mobile Payment</option>
+                                    <option value="fas fa-university">Bank Transfer</option>
+                                </select>
+                                 <p style="font-size: 0.9em; color: #555; margin-top: 5px;">Select an icon class from Font Awesome 6 Free. Example: fas fa-money-bill-wave</p> <!-- Hint for user -->
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-success">Save Payment Method</button>
+                                <button type="button" class="btn" onclick="resetPaymentMethodForm()">Reset</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Section -->
+            <div id="reports" class="content-section">
+                <div class="tabs">
+                     <!-- Removed 'active' classes -->
+                    <div class="tab" onclick="showTab('financial-reports', this)">Financial Reports</div>
+                    <div class="tab" onclick="showTab('patient-reports', this)">Patient Reports</div>
+                    <div class="tab" onclick="showTab('appointment-reports', this)">Appointment Reports</div>
+                </div>
+
+                 <!-- Removed 'active' class -->
+                <div id="financial-reports" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Financial Overview</h3>
+                            <div>
+                                <select id="financialReportPeriod" onchange="updateFinancialReport()">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                                <button class="btn" onclick="generateReport('financial')">Generate Report</button>
+                            </div>
+                        </div>
+                        <div class="chart-container" id="financialChart">
+                            <div style="text-align: center;">
+                                <i class="fas fa-chart-bar" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                                <p>Financial Report Visualization</p>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Period</th>
+                                        <th>Revenue</th>
+                                        <th>Expenses</th>
+                                        <th>Profit</th>
+                                        <th>Growth</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="financialReportTable"> <!-- Add ID to tbody -->
+                                     <!-- Static data rows -->
+                                    <tr>
+                                        <td>January 2023</td>
+                                        <td>\$12,450</td>
+                                        <td>\$8,320</td>
+                                        <td>\$4,130</td>
+                                        <td>+5.2%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>February 2023</td>
+                                        <td>\$13,280</td>
+                                        <td>\$8,560</td>
+                                        <td>\$4,720</td>
+                                        <td>+14.3%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>March 2023</td>
+                                        <td>\$14,560</td>
+                                        <td>\$9,120</td>
+                                        <td>\$5,440</td>
+                                        <td>+15.3%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="patient-reports" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Patient Statistics</h3>
+                            <button class="btn" onclick="generateReport('patient')">Generate Report</button>
+                        </div>
+                        <div class="chart-container" id="patientChart">
+                            <div style="text-align: center;">
+                                <i class="fas fa-chart-pie" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                                <p>Patient Demographics Visualization</p>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Count</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="patientReportTable"> <!-- Add ID to tbody -->
+                                     <!-- Static data rows -->
+                                    <tr>
+                                        <td>Total Patients</td>
+                                        <td>1254</td>
+                                        <td>100%</td>
+                                    </tr>
+                                     <tr>
+                                        <td>New Patients (This Month)</td>
+                                        <td>45</td>
+                                        <td>3.6%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Active Patients</td>
+                                        <td>876</td>
+                                        <td>69.9%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Inactive Patients</td>
+                                        <td>378</td>
+                                        <td>30.1%</td>
+                                    </tr>
+                                     <!-- Can add gender, age breakdown, etc. -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="appointment-reports" class="tab-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Appointment Analytics</h3>
+                            <button class="btn" onclick="generateReport('appointment')">Generate Report</button>
+                        </div>
+                        <div class="chart-container" id="appointmentChart">
+                            <div style="text-align: center;">
+                                <i class="fas fa-chart-line" style="font-size: 48px; color: var(--primary); margin-bottom: 15px;"></i>
+                                <p>Appointment Trends Visualization</p>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Count</th>
+                                        <th>Percentage</th>
+                                    </tr>
+                                </thead>
+                                 <tbody id="appointmentReportTable"> <!-- Add ID to tbody -->
+                                     <!-- Static data rows -->
+                                    <tr>
+                                         <td>Total Appointments (This Month)</td>
+                                         <td>312</td>
+                                         <td>100%</td>
+                                     </tr>
+                                    <tr>
+                                        <td>Completed Appointments</td>
+                                        <td>245</td>
+                                        <td>78.5%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Cancelled Appointments</td>
+                                        <td>32</td>
+                                        <td>10.3%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>No-Shows</td>
+                                        <td>35</td>
+                                        <td>11.2%</td>
+                                    </tr>
+                                     <!-- Can add breakdowns by doctor, treatment, section -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('confirmModal')">&times;</span>
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage">Are you sure you want to proceed with this action?</p>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn" onclick="closeModal('confirmModal')">Cancel</button>
+                <button class="btn btn-danger" id="confirmButton">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+     <!-- Note: script.js is loaded BEFORE the immediate redirect script block -->
+</body>
+</html>

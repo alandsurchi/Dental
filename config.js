@@ -1,0 +1,4 @@
+const SUPABASE_URL = 'https://xhetylendkldhtnngocb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoZXR5bGVuZGtsZGh0bm5nb2NiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTA2NzE5NzAsImV4cCI6MjAyNjI0Nzk3MH0.Hs-QcJEDkVxXHfKxYrg_g5e7RxkqwbE6IRhUAZhhjQY';
+
+export { SUPABASE_URL, SUPABASE_ANON_KEY }; 
